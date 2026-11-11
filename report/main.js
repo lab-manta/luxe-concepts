@@ -6,8 +6,7 @@
   var FONT = 'Inter, system-ui, sans-serif';
   var nf = new Intl.NumberFormat('en-AU');
   var fmtInt = function (v) { return nf.format(v); };
-  var fmtAud = function (v) { return 'A$' + new Intl.NumberFormat('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v); };
-  var fmtUsd = function (v) { return 'US$' + nf.format(v); };
+  var fmtAud = function (v) { return 'A$' + nf.format(v); };
   var narrow = function () { return window.matchMedia('(max-width: 720px)').matches; };
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -24,10 +23,17 @@
     opt = opt || {};
     var fmt = opt.fmt || fmtInt;
     var small = narrow();
-    var data = rows.map(function (r) { return { name: r.name, value: r.value, who: r.luxe ? 'Luxe' : 'Others' }; });
-    var longest = data.reduce(function (m, d) { return Math.max(m, d.name.length); }, 0);
+    function wrap(s) {
+      if (!small || s.length <= 22) return s;
+      var mid = Math.floor(s.length / 2), best = -1;
+      for (var i = 0; i < s.length; i++) if (s[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+      return best < 0 ? s : s.slice(0, best) + '\n' + s.slice(best + 1);
+    }
+    var data = rows.map(function (r) { return { name: wrap(r.name), value: r.value, who: r.luxe ? 'Luxe' : 'Others' }; });
+    var longest = data.reduce(function (m, d) { return Math.max.apply(null, [m].concat(d.name.split('\n').map(function (p) { return p.length; }))); }, 0);
+    var wrapped = data.some(function (d) { return d.name.indexOf('\n') > -1; });
     var labelW = Math.min(small ? 168 : 290, Math.round(longest * (small ? 6.1 : 7.4)) + 16);
-    var height = Math.max(150, data.length * (small ? 30 : 32) + 28);
+    var height = Math.max(150, data.length * (small ? (wrapped ? 40 : 30) : 32) + 28);
     box.style.height = height + 'px';
     box.innerHTML = '';
     var chart = new G2.Chart({ container: box, autoFit: true, height: height });
@@ -83,12 +89,12 @@
     charts = [];
     var mk = R.market_keywords_chart.rows;
     bars('chart-searches', mk.map(function (r) { return { name: r.keyword, value: r.searches }; }), { unit: 'Searches a month' });
-    bars('chart-cpc', mk.map(function (r) { return { name: r.keyword, value: r.cpc }; }), { fmt: fmtAud, unit: 'Cost per click', axisFmt: function (v) { return 'A$' + v; }, padRight: 70 });
+    bars('chart-cpc', mk.map(function (r) { return { name: r.keyword, value: r.cpc }; }), { fmt: fmtAud, unit: 'Cost per click (estimate)', axisFmt: function (v) { return 'A$' + v; }, padRight: 52 });
     bars('chart-links', R.rank_linking_sites.rows, { unit: 'Linking sites' });
     bars('chart-kws', R.rank_ranked_keywords.rows, { unit: 'Searches' });
     bars('chart-mapwin', R.map_top3_winners.rows, { unit: 'Checks in the top ' + R.defs.top3, padRight: 40 });
     bars('chart-ai', R.ai_mentions.rows, { unit: 'Answers naming them', padRight: 40 });
-    bars('chart-ads', R.ads_rivals.rows.map(function (r) { return { name: r.name, value: r.ads, luxe: r.luxe }; }), { unit: 'Ads on record', padRight: 40 });
+    bars('chart-ads', R.ads_rivals.rows.map(function (r) { return { name: r.name, value: r.ads, luxe: r.luxe }; }), { unit: 'Ads found', padRight: 40 });
     bars('chart-budget', R.budget_scenarios.rows.map(function (r) { return { name: r.label, value: r.clicks, luxe: true }; }), { unit: 'Clicks a month' });
   }
 
@@ -129,7 +135,7 @@
     var current = 0, selected = 'Sutherland', markers = {};
     function rowsFor(k) { return g.rows.filter(function (r) { return r.keyword === g.keywords[k]; }); }
     function cls(r) { return r.luxe_rank == null ? 'none' : (r.luxe_rank <= R.defs.top3 ? 'top' : 'mid'); }
-    function statusText(r) { return r.luxe_rank == null ? 'Luxe not found in the first ' + R.defs.depth + ' results' : 'Luxe is number ' + r.luxe_rank; }
+    function statusText(r) { return r.luxe_rank == null ? 'Luxe not found in the results Google returned (up to ' + R.defs.depth + ')' : 'Luxe is number ' + r.luxe_rank; }
     function showCard(r) {
       card.innerHTML = '';
       card.appendChild(el('h4', null, r.point));
@@ -245,8 +251,8 @@
         tr.appendChild(el('td', null, r.first_seen || ''));
       }
       var sp = el('td', 'num');
-      if (r.semrush_12m_usd > 0) sp.textContent = fmtUsd(r.semrush_12m_usd) + ' or more';
-      else { sp.textContent = 'None seen by Semrush'; sp.classList.add('dim'); }
+      if (r.semrush_12m_aud > 0) sp.textContent = 'about ' + fmtAud(r.semrush_12m_aud);
+      else { sp.textContent = 'None shown by Semrush'; sp.classList.add('dim'); }
       tr.appendChild(sp);
       tb.appendChild(tr);
     });
